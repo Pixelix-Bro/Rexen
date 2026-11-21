@@ -14,6 +14,7 @@ gsap.registerPlugin(ScrollTrigger)
 
 const SHOW_DOT_GRID = false // true qilsangiz fonda DotGrid ham chiqadi
 const OVERLAY = 'bg-black/40' // fonni qoraytirish (matn o'qilishi uchun). Qoraroq: bg-black/60
+const LOAD_TIMEOUT = 20000 // internet juda sekin bo'lsa, shuncha millisekunddan keyin baribir ochiladi
 
 // Har bir obyekt = bitta to'liq ekranli bo'lim. Qo'shsangiz yoki o'chirsangiz,
 // sahifa balandligi va video tezligi avtomatik moslashadi.
@@ -49,17 +50,21 @@ const FRAMES_DIR = '/media/frames'
 const FRAMES_DIR_SM = '/media/frames-sm'
 const MOBILE_BREAKPOINT = 768
 
+// Kadrlar bir marta to'liq yuklangach, sahifalar orasida qaytganda yuklash ekrani qayta chiqmaydi
+let allLoaded = false
+
 const frameSrc = (dir, i) => `${dir}/f_${String(i + 1).padStart(3, '0')}.webp`
 const isReady = (img) => !!img && img.complete && img.naturalWidth > 0
 
-/* Ko'rinishga kirganda paydo bo'ladi, chiqib ketganda yashirinadi */
-const Reveal = ({ children, className = '' }) => {
+/* Ko'rinishga kirganda paydo bo'ladi, chiqib ketganda yashirinadi.
+   active=false bo'lsa (yuklash ekrani ochiq paytida) kutib turadi. */
+const Reveal = ({ children, className = '', active = true }) => {
   const ref = useRef(null)
-  const [visible, setVisible] = useState(false)
+  const [inView, setInView] = useState(false)
 
   useEffect(() => {
     const el = ref.current
-    const io = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting), {
+    const io = new IntersectionObserver(([entry]) => setInView(entry.isIntersecting), {
       threshold: 0.4,
     })
     io.observe(el)
@@ -70,7 +75,7 @@ const Reveal = ({ children, className = '' }) => {
     <div
       ref={ref}
       className={`transition-all duration-700 ease-out motion-reduce:transition-none ${
-        visible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'
+        inView && active ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'
       } ${className}`}
     >
       {children}
@@ -85,9 +90,11 @@ const ALIGN = {
 }
 
 /* Bitta to'liq ekranli bo'lim */
-const Panel = ({ align = 'center', children }) => (
+const Panel = ({ align = 'center', active, children }) => (
   <div className="flex h-screen items-center px-6 md:px-16">
-    <Reveal className={`flex w-full max-w-2xl flex-col gap-4 ${ALIGN[align]}`}>{children}</Reveal>
+    <Reveal active={active} className={`flex w-full max-w-2xl flex-col gap-4 ${ALIGN[align]}`}>
+      {children}
+    </Reveal>
   </div>
 )
 
@@ -95,22 +102,42 @@ const Hero = () => {
   const sectionRef = useRef(null)
   const canvasRef = useRef(null)
   const hintRef = useRef(null)
-  const barRef = useRef(null)
-  const [ready, setReady] = useState(false)
+  const loaderRef = useRef(null)
+  const [ready, setReady] = useState(allLoaded)
 
   useEffect(() => {
     const section = sectionRef.current
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d', { alpha: false })
     const dir = window.innerWidth < MOBILE_BREAKPOINT ? FRAMES_DIR_SM : FRAMES_DIR
+    const root = document.documentElement
 
     let cancelled = false
+    let finished = allLoaded
     let frames = []
     let count = 0
     let current = 0 // hozir ko'rsatilishi kerak bo'lgan kadr
     let shown = -1 // canvas'da hozir chizilgan kadr
     let lastWidth = 0
+    let timer
     let trigger
+
+    // Yuklash tugaguncha scroll qilib bo'lmaydi
+    const lock = () => {
+      root.style.overflow = 'hidden'
+    }
+    const unlock = () => {
+      root.style.overflow = ''
+    }
+
+    const finish = () => {
+      if (finished || cancelled) return
+      finished = true
+      allLoaded = true
+      clearTimeout(timer)
+      unlock()
+      setReady(true)
+    }
 
     // Kadr hali yuklanmagan bo'lsa, eng yaqin yuklanganini topadi
     const nearest = (index) => {
@@ -136,9 +163,8 @@ const Hero = () => {
       ctx.drawImage(img, (cw - w) / 2, (ch - h) / 2, w, h)
     }
 
-    // Progress chizig'i va "Scroll" ko'rsatkichi: React'ni qayta chizdirmasdan, to'g'ridan-to'g'ri DOM
-    const updateUi = (progress) => {
-      if (barRef.current) barRef.current.style.transform = `scaleX(${progress})`
+    // "Scroll" yozuvi: scroll boshlanishi bilan yo'qoladi
+    const updateHint = (progress) => {
       if (hintRef.current) hintRef.current.style.opacity = progress > 0.02 ? '0' : '1'
     }
 
@@ -161,15 +187,18 @@ const Hero = () => {
         console.warn(
           `Hero: ${dir}/meta.json topilmadi. Loyiha ildizidan "node scripts/extract-frames.mjs" ni ishga tushiring.`
         )
+        finish() // yuklash ekrani qotib qolmasin
         return
       }
-      if (cancelled || !meta?.count) return
+      if (cancelled || !meta?.count) {
+        finish()
+        return
+      }
 
       count = meta.count
       frames = new Array(count)
 
-      // Avval siyrak kadrlar (har 16-, 8-, 4-, 2-chi), keyin qolganlari:
-      // yuklanish tugamasdan scroll qilinsa ham taxminiy kadr ko'rinadi
+      // Sekin internetda ham tez-tez kadr ko'rinishi uchun: avval siyrak kadrlar, keyin qolganlari
       const order = []
       const seen = new Set()
       for (const stride of [16, 8, 4, 2, 1]) {
@@ -181,16 +210,28 @@ const Hero = () => {
         }
       }
 
+      // Hamma kadrni oldindan yuklaydi va dekodlaydi
+      let loaded = 0
+      timer = setTimeout(finish, LOAD_TIMEOUT)
+
       for (const i of order) {
         const img = new Image()
         img.decoding = 'async'
-        img.onload = () => {
-          if (cancelled) return
-          draw(current)
-          setReady(true)
-        }
         img.src = frameSrc(dir, i)
         frames[i] = img
+
+        img
+          .decode()
+          .catch(() => {}) // bitta kadr buzuq bo'lsa ham qolganlari to'xtab qolmasin
+          .then(() => {
+            if (cancelled) return
+            loaded++
+            if (loaderRef.current) {
+              loaderRef.current.textContent = `${Math.round((loaded / count) * 100)}%`
+            }
+            draw(current)
+            if (loaded === count) finish()
+          })
       }
 
       // Scroll holatini kadr raqamiga aylantiradi (silliqlashni Lenis qiladi)
@@ -201,20 +242,23 @@ const Hero = () => {
         onUpdate: (self) => {
           current = Math.round(self.progress * (count - 1))
           draw(current)
-          updateUi(self.progress)
+          updateHint(self.progress)
         },
       })
       current = Math.round(trigger.progress * (count - 1))
       draw(current)
-      updateUi(trigger.progress)
+      updateHint(trigger.progress)
     }
 
+    if (!allLoaded) lock()
     resize()
     init()
     window.addEventListener('resize', resize)
 
     return () => {
       cancelled = true
+      clearTimeout(timer)
+      unlock()
       trigger?.kill()
       window.removeEventListener('resize', resize)
       frames.forEach((img) => {
@@ -225,15 +269,22 @@ const Hero = () => {
 
   return (
     <section ref={sectionRef} className="relative bg-black text-white">
+      {/* Yuklash ekrani: hamma kadr tayyor bo'lgach silliq yo'qoladi */}
+      <div
+        aria-hidden={ready}
+        className={`fixed inset-0 z-[100] flex flex-col items-center justify-center gap-3 bg-black text-white transition-opacity duration-700 ${
+          ready ? 'pointer-events-none opacity-0' : 'opacity-100'
+        }`}
+      >
+        <span ref={loaderRef} className="text-5xl font-semibold tabular-nums">
+          0%
+        </span>
+        <span className="text-xs uppercase tracking-widest text-white/50">Yuklanmoqda</span>
+      </div>
+
       {/* 1-qatlam: scroll paytida qotib turadigan fon */}
       <div className="sticky top-0 h-screen w-full overflow-hidden">
-        <canvas
-          ref={canvasRef}
-          aria-hidden="true"
-          className={`absolute inset-0 h-full w-full transition-opacity duration-700 ${
-            ready ? 'opacity-100' : 'opacity-0'
-          }`}
-        />
+        <canvas ref={canvasRef} aria-hidden="true" className="absolute inset-0 h-full w-full" />
         <div className={`absolute inset-0 ${OVERLAY}`} />
 
         {SHOW_DOT_GRID && (
@@ -242,22 +293,12 @@ const Hero = () => {
           </div>
         )}
 
-        {/* "Scroll" ko'rsatkichi: scroll boshlanishi bilan yo'qoladi */}
+        {/* "Scroll" yozuvi */}
         <div
           ref={hintRef}
-          className="pointer-events-none absolute bottom-8 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-2 text-xs uppercase tracking-widest text-white/70 transition-opacity duration-500"
+          className="pointer-events-none absolute bottom-8 left-1/2 z-20 -translate-x-1/2 text-xs uppercase tracking-widest text-white/70 transition-opacity duration-500"
         >
-          <span>Scroll</span>
-          <span className="h-10 w-px animate-pulse bg-white/60" />
-        </div>
-
-        {/* Progress chizig'i */}
-        <div className="absolute bottom-0 left-0 z-20 h-0.5 w-full bg-white/10">
-          <div
-            ref={barRef}
-            className="h-full origin-left bg-white/80"
-            style={{ transform: 'scaleX(0)' }}
-          />
+          Scroll
         </div>
       </div>
 
@@ -267,7 +308,7 @@ const Hero = () => {
         {SECTIONS.map((s, i) => {
           const Title = i === 0 ? 'h1' : 'h2'
           return (
-            <Panel key={s.title} align={s.align}>
+            <Panel key={s.title} align={s.align} active={ready}>
               <Title
                 className={
                   i === 0 ? 'text-4xl font-bold md:text-6xl' : 'text-3xl font-semibold md:text-5xl'
