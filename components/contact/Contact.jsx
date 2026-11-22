@@ -9,7 +9,7 @@ const CONTACT = {
   email: 'rexen.studio@gmail.com',
   phone: '+998 90 693 18 08',
   telegram: '@Pixelix',
-  telegramUrl: 'https://t.me/rexen_uz',
+  telegramUrl: 'https://t.me/pixeelix',
   location: 'Namangan, Uzbekistan',
 }
 
