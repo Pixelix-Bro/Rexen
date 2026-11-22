@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import Image from 'next/image'
-import GlassSurface from '../ui/GlassSurface'
+import Image from 'next/image';
+import { useEffect, useState } from 'react';
+import GlassSurface from '../ui/GlassSurface';
 
 /* =========================================
    LOGO CONFIGURATION
@@ -17,7 +17,7 @@ const LOGO_DARK = '/logo-white.png'
 const MENU = [
   { name: 'Home', link: '#home' },
   { name: 'About', link: '#about' },
-  { name: 'Why us', link: '#why' },
+  { name: 'Projects', link: '#projects' },
   { name: 'FAQ', link: '#faq' },
   { name: 'Contact', link: '#contact' },
 ]
@@ -136,7 +136,7 @@ export default function Navbar() {
         <div
           className={`
       mx-auto w-full
-      transition-all duration-[1400ms]
+      transition-all duration-200
       ease-[cubic-bezier(0.22,1,0.36,1)]
       ${scrolled ? 'max-w-[1560px]' : 'max-w-none'}
     `}
@@ -149,6 +149,7 @@ export default function Navbar() {
               distortionScale={-150}
               displace={1.5}
               backgroundOpacity={lightTheme ? 0.12 : 0.08}
+              className='transition-all duration-200'
             >
               <div className="flex h-[94px] w-full items-center">
                 <Navigation
