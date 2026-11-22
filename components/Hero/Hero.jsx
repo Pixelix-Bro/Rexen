@@ -1,24 +1,21 @@
 'use client'
 
-import { createFrameSequence } from '@/components/Hero/frameSequence '
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { AnimatePresence, MotionConfig, motion } from 'motion/react'
 import { useEffect, useRef, useState } from 'react'
 import GlassSurface from '../ui/GlassSurface'
+import { createFrameSequence } from '@/components/Hero/frameSequence ';
 
 if (typeof window !== 'undefined') {
   gsap.registerPlugin(ScrollTrigger)
   ScrollTrigger.config({ ignoreMobileResize: true })
 }
 
-/* =========================================
-   CONFIG
-========================================= */
 
-const TOTAL_FRAMES = 120 // f_001.webp … f_120.webp in /public/media/frames
+const TOTAL_FRAMES = 120 // f_001.avif … f_120.avif in /public/media/frames
 const framePath = (i, compact = false) =>
-  `/media/${compact ? 'frames-sm' : 'frames'}/f_${String(i + 1).padStart(3, '0')}.webp`
+  `/media/${compact ? 'frames-sm' : 'frames'}/f_${String(i + 1).padStart(3, '0')}.avif`
 
 // Kadr silliqlash tezligi: yuqori = kadrlar scrollga tezroq yetib boradi (6–10 oralig'ida sinang)
 const SMOOTH = 7
@@ -239,6 +236,7 @@ export default function Hero() {
     const frame = { value: 0 } // ekrandagi (silliqlangan) kadr
     const target = { value: 0 } // scroll ko'rsatayotgan kadr
     let drawn = -1
+    let currentSection = 0 // setActive faqat o'zgarganda chaqiriladi (ortiqcha render yo'q)
 
     const seq = createFrameSequence(canvas, {
       total: TOTAL_FRAMES,
@@ -282,7 +280,12 @@ export default function Hero() {
 
         target.value = f
         seq.prefetch(f)
-        setActive(Math.min(Math.floor(p * SECTIONS.length), SECTIONS.length - 1))
+
+        const next = Math.min(Math.floor(p * SECTIONS.length), SECTIONS.length - 1)
+        if (next !== currentSection) {
+          currentSection = next
+          setActive(next)
+        }
 
         setCurtain(100 * (1 - out * out * (3 - 2 * out)))
         setContent(1 - clamp01(out * 2))
@@ -294,7 +297,11 @@ export default function Hero() {
         start: 'top top',
         end: 'bottom bottom',
         onUpdate: update,
-        onRefresh: update,
+        onRefresh: (self) => {
+          update(self)
+          // sahifa scroll holatida qayta yuklansa: 0-kadrdan "uchib" kelmasin
+          frame.value = target.value
+        },
       })
     })
 
@@ -315,7 +322,6 @@ export default function Hero() {
         <div className="sticky top-0 h-[100svh] w-full overflow-hidden">
           {/* FRAMES: poster shows instantly, canvas fades in over it */}
           <div ref={stageRef} className="absolute inset-0">
-            {}
             <picture>
               <source media="(max-width: 1024px)" srcSet={framePath(0, true)} />
               <img
@@ -332,7 +338,7 @@ export default function Hero() {
             <canvas
               ref={canvasRef}
               aria-hidden="true"
-              className="absolute inset-0 h-full w-full opacity-0 will-change-opacity"
+              className="absolute inset-0 h-full w-full opacity-0 will-change-[opacity]"
             />
           </div>
 

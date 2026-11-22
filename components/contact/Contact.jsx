@@ -6,11 +6,11 @@ import { useState } from 'react'
 const EASE = [0.16, 1, 0.3, 1]
 
 const CONTACT = {
-  email: 'hello@rexen.uz',
-  phone: '+998 90 000 00 00',
-  telegram: '@rexen',
-  telegramUrl: 'https://t.me/rexen',
-  location: 'Tashkent, Uzbekistan',
+  email: 'rexen.studio@gmail.com',
+  phone: '+998 90 693 18 08',
+  telegram: '@Pixelix',
+  telegramUrl: 'https://t.me/rexen_uz',
+  location: 'Namangan, Uzbekistan',
 }
 
 // route.js dagi ALLOWED_SERVICES bilan bir xil bo'lishi kerak
