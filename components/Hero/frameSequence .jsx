@@ -1,204 +1,151 @@
 /**
- * Canvas frame-sequence player.
- *  - draw(value): value is a float frame number; two neighbouring frames are
- *    cross-blended (e.g. 41.4 = 60% of #41 + 40% of #42), so motion stays soft
- *    even with only 200 frames.
- *  - prefetch(frame): loads frames around the target in the scroll direction,
- *    cancels downloads that are no longer needed.
+ * Canvas frame sequence with cross-fade between neighbouring frames.
+ *
+ * draw(5.37) -> draws frame 5 fully, then frame 6 on top at 37% opacity.
+ * Frame o'tishlari shu tufayli umuman bilinmaydi.
  */
-
-const clamp = (v, min, max) => Math.min(Math.max(v, min), max)
-
 export function createFrameSequence(
   canvas,
-  { total, path, onReady, maxCache = 60, ahead = 28, behind = 10, maxLoads = 6 }
+  { total, path, onReady, concurrency = 6, lookahead = 24 }
 ) {
   const ctx = canvas.getContext('2d', { alpha: false })
-  const cache = new Map() // index -> ImageBitmap
-  const inflight = new Map() // index -> AbortController
-  const fails = new Map() // index -> failed attempts
-
+  const images = new Array(total).fill(null) // loaded Image objects
+  const state = new Array(total).fill(0) // 0 = idle, 1 = loading, 2 = loaded, 3 = failed
   let queue = []
-  let w = 0
-  let h = 0
-  let current = 0
-  let target = 0
-  let dir = 1
-  let lastKey = ''
-  let lastCenter = -1
+  let active = 0
+  let destroyed = false
   let ready = false
-  let dead = false
+  let lastValue = 0
+  let width = 0
+  let height = 0
 
-  const nearest = (i) => {
-    if (cache.has(i)) return i
-
-    let best = null
-    let gap = Infinity
-
-    for (const k of cache.keys()) {
-      const d = Math.abs(k - i)
-      if (d < gap) {
-        gap = d
-        best = k
-      }
-    }
-
-    return best
-  }
-
-  const paint = (bitmap, alpha) => {
-    const s = Math.max(w / bitmap.width, h / bitmap.height) // object-fit: cover
-
-    ctx.globalAlpha = alpha
-    ctx.drawImage(
-      bitmap,
-      (w - bitmap.width * s) / 2,
-      (h - bitmap.height * s) / 2,
-      bitmap.width * s,
-      bitmap.height * s
-    )
-  }
-
-  const draw = (value = current, force = false) => {
-    current = clamp(value, 0, total - 1)
-
-    if (!w || !h) return
-
-    const i = Math.floor(current)
-    const t = current - i
-    const a = nearest(i)
-
-    if (a === null) return
-
-    const b = t > 0.01 && cache.has(i + 1) ? i + 1 : null
-    const key = `${a}|${b}|${b === null ? 0 : t.toFixed(3)}`
-
-    if (key === lastKey && !force) return
-    lastKey = key
-
-    paint(cache.get(a), 1)
-    if (b !== null && b !== a) paint(cache.get(b), t)
-    ctx.globalAlpha = 1
-
-    if (!ready) {
-      ready = true
-      onReady?.()
-    }
-  }
-
-  const evict = () => {
-    while (cache.size > maxCache) {
-      let far = -1
-      let gap = -1
-
-      for (const k of cache.keys()) {
-        const d = Math.abs(k - target)
-        if (k !== 0 && d > gap) {
-          gap = d
-          far = k
-        }
-      }
-
-      if (far < 0) break
-
-      cache.get(far).close()
-      cache.delete(far)
-    }
-  }
-
-  const load = async (i) => {
-    const ac = new AbortController()
-    inflight.set(i, ac)
-
-    try {
-      const res = await fetch(path(i), { signal: ac.signal })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-
-      const bitmap = await createImageBitmap(await res.blob())
-
-      if (dead || ac.signal.aborted) {
-        bitmap.close()
-        return
-      }
-
-      cache.set(i, bitmap)
-      fails.delete(i)
-      evict()
-      draw(current)
-    } catch (error) {
-      if (error.name !== 'AbortError') fails.set(i, (fails.get(i) || 0) + 1)
-    } finally {
-      inflight.delete(i)
-      pump()
-    }
-  }
-
-  const pump = () => {
-    while (!dead && inflight.size < maxLoads && queue.length) {
-      const i = queue.shift()
-      if (!cache.has(i) && !inflight.has(i)) load(i)
-    }
-  }
-
-  const prefetch = (frame) => {
-    if (frame !== target) dir = frame > target ? 1 : -1
-    target = frame
-
-    const c = Math.round(clamp(frame, 0, total - 1))
-
-    if (c === lastCenter) return
-    lastCenter = c
-
-    const fwd = dir > 0 ? ahead : behind
-    const back = dir > 0 ? behind : ahead
-    const wanted = [c]
-
-    for (let d = 1; d <= Math.max(fwd, back); d++) {
-      if (d <= fwd && c + d < total) wanted.push(c + d)
-      if (d <= back && c - d >= 0) wanted.push(c - d)
-    }
-
-    const set = new Set(wanted)
-    inflight.forEach((ac, i) => set.has(i) || ac.abort())
-
-    queue = wanted.filter((i) => !cache.has(i) && !inflight.has(i) && (fails.get(i) || 0) < 3)
-
-    pump()
-  }
+  /* ---------- sizing ---------- */
 
   const resize = () => {
-    w = canvas.clientWidth
-    h = canvas.clientHeight
-
-    if (!w || !h) return
-
-    const dpr = Math.min(window.devicePixelRatio || 1, window.innerWidth < 768 ? 1.25 : 1.5)
-
-    canvas.width = Math.round(w * dpr)
-    canvas.height = Math.round(h * dpr)
-
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    ctx.imageSmoothingQuality = 'high'
-
-    draw(current, true)
+    const dpr = Math.min(window.devicePixelRatio || 1, 2)
+    const w = Math.max(1, Math.round(canvas.clientWidth * dpr))
+    const h = Math.max(1, Math.round(canvas.clientHeight * dpr))
+    if (w === width && h === height) return
+    width = canvas.width = w
+    height = canvas.height = h
+    render(lastValue)
   }
 
-  const observer = new ResizeObserver(resize)
-  observer.observe(canvas)
+  const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(resize) : null
+  ro?.observe(canvas)
 
-  resize()
-  prefetch(0)
+  /* ---------- drawing ---------- */
+
+  // nearest loaded frame to index i (so we never draw a blank canvas)
+  const nearest = (i) => {
+    if (images[i]) return images[i]
+    for (let d = 1; d < total; d++) {
+      if (i - d >= 0 && images[i - d]) return images[i - d]
+      if (i + d < total && images[i + d]) return images[i + d]
+    }
+    return null
+  }
+
+  const cover = (img, alpha) => {
+    const iw = img.naturalWidth
+    const ih = img.naturalHeight
+    if (!iw || !ih) return
+    const s = Math.max(width / iw, height / ih)
+    const dw = iw * s
+    const dh = ih * s
+    ctx.globalAlpha = alpha
+    ctx.drawImage(img, (width - dw) / 2, (height - dh) / 2, dw, dh)
+  }
+
+  function render(value) {
+    if (!width || !height) return
+    const v = Math.min(Math.max(value, 0), total - 1)
+    const a = Math.floor(v)
+    const b = Math.min(a + 1, total - 1)
+    const t = v - a
+
+    const imgA = nearest(a)
+    if (!imgA) return
+    const imgB = t > 0.001 ? nearest(b) : null
+
+    cover(imgA, 1)
+    if (imgB && imgB !== imgA) cover(imgB, t)
+    ctx.globalAlpha = 1
+  }
+
+  /* ---------- loading ---------- */
+
+  const pump = () => {
+    while (!destroyed && active < concurrency && queue.length) {
+      const i = queue.shift()
+      if (state[i] !== 0) continue
+      state[i] = 1
+      active++
+
+      const img = new Image()
+      img.decoding = 'async'
+      img.src = path(i)
+
+      const done = (ok) => {
+        active--
+        if (destroyed) return
+        if (ok) {
+          images[i] = img
+          state[i] = 2
+          if (!ready && i === 0) {
+            ready = true
+            resize()
+            render(lastValue)
+            onReady?.()
+          } else if (Math.abs(i - lastValue) < 2) {
+            render(lastValue)
+          }
+        } else {
+          state[i] = 3
+        }
+        pump()
+      }
+
+      const decode = img.decode ? img.decode() : Promise.resolve()
+      decode.then(() => done(true)).catch(() => done(img.complete && img.naturalWidth > 0))
+    }
+  }
+
+  // initial order: first frame, then every 6th (coarse coverage), then the rest
+  const order = [0]
+  for (let i = 6; i < total; i += 6) order.push(i)
+  for (let i = 1; i < total; i++) if (i % 6 !== 0) order.push(i)
+  queue = order
+  pump()
+
+  /* ---------- public API ---------- */
 
   return {
-    draw,
-    prefetch,
+    draw(value) {
+      lastValue = value
+      render(value)
+    },
+
+    // scroll joyiga yaqin kadrlarni birinchi yuklaydi
+    prefetch(value) {
+      const c = Math.round(value)
+      const urgent = []
+      for (let d = 0; d <= lookahead; d++) {
+        for (const i of [c + d, c - d]) {
+          if (i >= 0 && i < total && state[i] === 0 && !urgent.includes(i)) urgent.push(i)
+        }
+      }
+      if (urgent.length) {
+        queue = urgent.concat(queue.filter((i) => !urgent.includes(i)))
+        pump()
+      }
+    },
+
     destroy() {
-      dead = true
+      destroyed = true
+      ro?.disconnect()
       queue = []
-      observer.disconnect()
-      inflight.forEach((ac) => ac.abort())
-      cache.forEach((bitmap) => bitmap.close())
-      cache.clear()
+      images.fill(null)
     },
   }
 }

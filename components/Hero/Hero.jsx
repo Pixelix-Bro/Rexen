@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { createFrameSequence } from '@/components/Hero/frameSequence '
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { AnimatePresence, MotionConfig, motion } from 'motion/react'
+import { useEffect, useRef, useState } from 'react'
 import GlassSurface from '../ui/GlassSurface'
-import {createFrameSequence} from "@/components/Hero/frameSequence "
+
 if (typeof window !== 'undefined') {
   gsap.registerPlugin(ScrollTrigger)
   ScrollTrigger.config({ ignoreMobileResize: true })
@@ -18,7 +19,8 @@ if (typeof window !== 'undefined') {
 const TOTAL_FRAMES = 120 // f_001.webp … f_120.webp in /public/media/frames
 const framePath = (i) => `/media/frames/f_${String(i + 1).padStart(3, '0')}.webp`
 
-const FRAME_SMOOTH = 0.9 // seconds the frames "glide" after scrolling (higher = softer)
+// Kadr silliqlash tezligi: yuqori = kadrlar scrollga tezroq yetib boradi (6–10 oralig'ida sinang)
+const SMOOTH = 7
 const DIM = 0.2 // dark filter over the frames: 0 = none, 0.4 = strong
 
 // Last part of the scroll: the hero melts into the white section below it.
@@ -77,34 +79,34 @@ const EASE = [0.16, 1, 0.3, 1]
 
 const stagger = {
   hidden: {},
-  show: { transition: { staggerChildren: 0.07, delayChildren: 0.05 } },
-  exit: { transition: { staggerChildren: 0.03, staggerDirection: -1 } },
+  show: { transition: { staggerChildren: 0.06, delayChildren: 0.02 } },
+  exit: { transition: { staggerChildren: 0.01, staggerDirection: -1 } },
 }
 
 const rows = {
   hidden: {},
-  show: { transition: { staggerChildren: 0.05 } },
-  exit: { transition: { staggerChildren: 0.02 } },
+  show: { transition: { staggerChildren: 0.04 } },
+  exit: { transition: { staggerChildren: 0.01 } },
 }
 
 // text slides up from behind a mask
 const rise = {
   hidden: { y: '105%' },
-  show: { y: 0, transition: { duration: 1.1, ease: EASE } },
-  exit: { y: '-105%', transition: { duration: 0.5, ease: [0.7, 0, 0.84, 0] } },
+  show: { y: 0, transition: { duration: 0.9, ease: EASE } },
+  exit: { y: '-105%', transition: { duration: 0.28, ease: [0.7, 0, 0.84, 0] } },
 }
 
 const fade = {
   hidden: { opacity: 0, y: 14 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.9, ease: EASE } },
-  exit: { opacity: 0, transition: { duration: 0.25 } },
+  show: { opacity: 1, y: 0, transition: { duration: 0.7, ease: EASE } },
+  exit: { opacity: 0, transition: { duration: 0.15 } },
 }
 
 // hairlines draw from left to right
 const grow = {
   hidden: { scaleX: 0 },
-  show: { scaleX: 1, transition: { duration: 1.1, ease: EASE } },
-  exit: { scaleX: 0, transition: { duration: 0.4 } },
+  show: { scaleX: 1, transition: { duration: 0.9, ease: EASE } },
+  exit: { scaleX: 0, transition: { duration: 0.2 } },
 }
 
 /* =========================================
@@ -226,7 +228,10 @@ export default function Hero() {
     const curtain = curtainRef.current
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
-    const frame = { value: 0 } // smoothed frame number, animated by GSAP
+    const gc = gsap.context(() => {}, root) // avval e'lon qilinadi
+
+    const frame = { value: 0 } // ekrandagi (silliqlangan) kadr
+    const target = { value: 0 } // scroll ko'rsatayotgan kadr
     let drawn = -1
 
     const seq = createFrameSequence(canvas, {
@@ -236,8 +241,15 @@ export default function Hero() {
         gc.add(() => gsap.to(canvas, { opacity: 1, duration: 0.8, ease: 'power2.out' })),
     })
 
-    // Draw only when the smoothed value actually changed.
-    const tick = () => {
+    // Vaqtga asoslangan silliqlash: scroll tez bo'lsa ham, sekin bo'lsa ham bir xil his beradi
+    const tick = (_time, deltaTime) => {
+      const dt = Math.min(deltaTime, 50) / 1000
+      const k = reduce ? 1 : 1 - Math.exp(-SMOOTH * dt)
+
+      frame.value += (target.value - frame.value) * k
+      if (Math.abs(target.value - frame.value) < 0.005) frame.value = target.value
+
+      // kasr kadr uzatiladi: ikki qo'shni kadr bir-biriga aralashib o'tadi
       if (frame.value !== drawn) {
         drawn = frame.value
         seq.draw(frame.value)
@@ -245,12 +257,8 @@ export default function Hero() {
     }
     gsap.ticker.add(tick)
 
-    const gc = gsap.context(() => {
+    gc.add(() => {
       gsap.from(stageRef.current, { scale: 1.08, duration: 2.4, ease: 'expo.out' })
-
-      const frameTo = reduce
-        ? (f) => (frame.value = f)
-        : gsap.quickTo(frame, 'value', { duration: FRAME_SMOOTH, ease: 'power3.out' })
 
       // white curtain starts hidden below the stage (opacity 0 in JSX avoids a flash before JS)
       gsap.set(curtain, { yPercent: 100, opacity: 1 })
@@ -264,8 +272,8 @@ export default function Hero() {
         const out = clamp01((progress - FRAMES_END) / (1 - FRAMES_END)) // white fade
         const f = p * (TOTAL_FRAMES - 1)
 
+        target.value = f
         seq.prefetch(f)
-        frameTo(f)
         setActive(Math.min(Math.floor(p * SECTIONS.length), SECTIONS.length - 1))
 
         setCurtain(100 * (1 - out * out * (3 - 2 * out)))
@@ -280,7 +288,7 @@ export default function Hero() {
         onUpdate: update,
         onRefresh: update,
       })
-    }, root)
+    })
 
     return () => {
       gsap.ticker.remove(tick)
@@ -292,6 +300,7 @@ export default function Hero() {
   return (
     <MotionConfig reducedMotion="user">
       <section
+        id="home"
         ref={rootRef}
         className="relative h-[450svh] bg-[#070707] font-['Manrope'] text-white"
       >
