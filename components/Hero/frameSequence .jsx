@@ -84,6 +84,7 @@ export function createFrameSequence(
 
       const img = new Image()
       img.decoding = 'async'
+      img.fetchPriority = i === 0 || Math.abs(i - lastValue) < 2 ? 'high' : 'low'
       img.src = path(i)
 
       const done = (ok) => {
@@ -111,11 +112,8 @@ export function createFrameSequence(
     }
   }
 
-  // initial order: first frame, then every 6th (coarse coverage), then the rest
-  const order = [0]
-  for (let i = 6; i < total; i += 6) order.push(i)
-  for (let i = 1; i < total; i++) if (i % 6 !== 0) order.push(i)
-  queue = order
+  // Load the poster first; scrolling requests only the nearby frame window.
+  queue = [0]
   pump()
 
   /* ---------- public API ---------- */
@@ -129,14 +127,14 @@ export function createFrameSequence(
     // scroll joyiga yaqin kadrlarni birinchi yuklaydi
     prefetch(value) {
       const c = Math.round(value)
-      const urgent = []
+      const urgent = new Set()
       for (let d = 0; d <= lookahead; d++) {
         for (const i of [c + d, c - d]) {
-          if (i >= 0 && i < total && state[i] === 0 && !urgent.includes(i)) urgent.push(i)
+          if (i >= 0 && i < total && state[i] === 0) urgent.add(i)
         }
       }
-      if (urgent.length) {
-        queue = urgent.concat(queue.filter((i) => !urgent.includes(i)))
+      if (urgent.size) {
+        queue = [...urgent]
         pump()
       }
     },

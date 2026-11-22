@@ -17,7 +17,8 @@ if (typeof window !== 'undefined') {
 ========================================= */
 
 const TOTAL_FRAMES = 120 // f_001.webp … f_120.webp in /public/media/frames
-const framePath = (i) => `/media/frames/f_${String(i + 1).padStart(3, '0')}.webp`
+const framePath = (i, compact = false) =>
+  `/media/${compact ? 'frames-sm' : 'frames'}/f_${String(i + 1).padStart(3, '0')}.webp`
 
 // Kadr silliqlash tezligi: yuqori = kadrlar scrollga tezroq yetib boradi (6–10 oralig'ida sinang)
 const SMOOTH = 7
@@ -42,7 +43,7 @@ const SECTIONS = [
     accent: 'DIGITAL FUTURE.',
     description:
       'We design and engineer websites, CRM systems, SaaS platforms and intelligent digital products that move businesses forward.',
-    cta: { label: 'Explore Our Work', href: '#projects' },
+    cta: { label: 'Explore Our Work', href: '#about' },
   },
   {
     eyebrow: 'WHAT WE DO',
@@ -227,6 +228,11 @@ export default function Hero() {
     const content = contentRef.current
     const curtain = curtainRef.current
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const connection = navigator.connection
+    const compactFrames =
+      window.matchMedia('(max-width: 1024px)').matches ||
+      connection?.saveData ||
+      ['slow-2g', '2g', '3g'].includes(connection?.effectiveType)
 
     const gc = gsap.context(() => {}, root) // avval e'lon qilinadi
 
@@ -236,7 +242,9 @@ export default function Hero() {
 
     const seq = createFrameSequence(canvas, {
       total: TOTAL_FRAMES,
-      path: framePath,
+      path: (i) => framePath(i, compactFrames),
+      concurrency: compactFrames ? 4 : 6,
+      lookahead: compactFrames ? 6 : 10,
       onReady: () =>
         gc.add(() => gsap.to(canvas, { opacity: 1, duration: 0.8, ease: 'power2.out' })),
     })
@@ -307,18 +315,24 @@ export default function Hero() {
         <div className="sticky top-0 h-[100svh] w-full overflow-hidden">
           {/* FRAMES: poster shows instantly, canvas fades in over it */}
           <div ref={stageRef} className="absolute inset-0">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={framePath(0)}
-              alt=""
-              aria-hidden="true"
-              draggable={false}
-              className="absolute inset-0 h-full w-full object-cover"
-            />
+            {}
+            <picture>
+              <source media="(max-width: 1024px)" srcSet={framePath(0, true)} />
+              <img
+                src={framePath(0)}
+                alt=""
+                aria-hidden="true"
+                draggable={false}
+                fetchPriority="high"
+                decoding="sync"
+                loading="eager"
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+            </picture>
             <canvas
               ref={canvasRef}
               aria-hidden="true"
-              className="absolute inset-0 h-full w-full opacity-0"
+              className="absolute inset-0 h-full w-full opacity-0 will-change-opacity"
             />
           </div>
 

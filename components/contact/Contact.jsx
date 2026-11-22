@@ -1,13 +1,9 @@
 'use client'
 
-import { useState } from 'react'
 import { AnimatePresence, MotionConfig, motion } from 'motion/react'
+import { useState } from 'react'
 
 const EASE = [0.16, 1, 0.3, 1]
-
-/* =========================================
-   TODO: o'zingizning haqiqiy ma'lumotlaringizni yozing
-========================================= */
 
 const CONTACT = {
   email: 'hello@rexen.uz',
@@ -207,7 +203,7 @@ function ContactForm() {
   return (
     <motion.div
       {...reveal(0.3)}
-      className="rounded-[28px] border border-white/10 bg-white/[0.03] p-6 md:p-[clamp(1.5rem,4vh,2.5rem)]"
+      className="rounded-[28px] border border-white/10 bg-white/3 p-6 md:p-[clamp(1.5rem,4vh,2.5rem)]"
     >
       <AnimatePresence mode="wait" initial={false}>
         {status === 'success' ? (
@@ -236,7 +232,7 @@ function ContactForm() {
             <h3 className="font-['Bebas'] text-[clamp(2.6rem,5vw,4rem)] leading-[0.9]">
               Message sent.
             </h3>
-            <p className="max-w-[380px] text-[15px] leading-[1.75] text-white/60">
+            <p className="max-w-95 text-[15px] leading-[1.75] text-white/60">
               Thank you. We will review your message and get back to you at the email you left.
             </p>
             <button
@@ -317,7 +313,7 @@ function ContactForm() {
                       type="button"
                       aria-pressed={active}
                       onClick={() => toggleService(name)}
-                      className={`cursor-pointer rounded-full border px-4 py-[7px] text-[13px] font-medium transition-colors duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${
+                      className={`cursor-pointer rounded-full border px-4 py-1.75 text-[13px] font-medium transition-colors duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${
                         active
                           ? 'border-white bg-white text-black'
                           : 'border-white/15 text-white/70 hover:border-white/50 hover:text-white'
@@ -346,7 +342,7 @@ function ContactForm() {
             </Field>
 
             {/* spam tuzoq: odam ko'rmaydi */}
-            <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
+            <div aria-hidden="true" className="absolute left-[-9999px] h-0 w-0 overflow-hidden">
               <label>
                 Website
                 <input
@@ -364,7 +360,7 @@ function ContactForm() {
               <button
                 type="submit"
                 disabled={status === 'sending'}
-                className="group inline-flex w-fit shrink-0 cursor-pointer items-center gap-3 rounded-full bg-white px-8 py-[14px] text-[14px] font-semibold text-black transition-colors duration-500 hover:bg-white/85 disabled:cursor-wait disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
+                className="group inline-flex w-fit shrink-0 cursor-pointer items-center gap-3 rounded-full bg-white px-8 py-3.5 text-[14px] font-semibold text-black transition-colors duration-500 hover:bg-white/85 disabled:cursor-wait disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
               >
                 <span>{status === 'sending' ? 'Sending…' : 'Send message'}</span>
                 <span
@@ -377,7 +373,7 @@ function ContactForm() {
 
               <p
                 role={status === 'error' ? 'alert' : undefined}
-                className={`max-w-[300px] text-[12px] leading-[1.6] sm:text-right ${
+                className={`max-w-75 text-[12px] leading-[1.6] sm:text-right ${
                   status === 'error' ? 'text-[#ff8f8f]' : 'text-white/35'
                 }`}
               >
@@ -403,7 +399,7 @@ export default function Contact() {
       <section
         id="contact"
         data-nav-theme="dark"
-        className="relative flex min-h-[100svh] flex-col bg-[#070707] font-['Manrope'] text-white"
+        className="relative flex min-h-svh flex-col bg-[#070707] font-['Manrope'] text-white"
       >
         {/* yuqori padding navbar uchun, balandlik ekranga qarab moslashadi */}
         <div className="mx-auto flex w-full max-w-[1560px] flex-1 flex-col px-6 pb-16 pt-28 md:px-12 md:pb-[clamp(2rem,6vh,4rem)] md:pt-[clamp(7.5rem,16vh,9.5rem)]">
@@ -419,7 +415,7 @@ export default function Contact() {
 
               <motion.p
                 {...reveal(0.3)}
-                className="mt-[clamp(1rem,3vh,2rem)] max-w-[400px] text-[14px] leading-[1.75] text-white/60 md:text-[15px]"
+                className="mt-[clamp(1rem,3vh,2rem)] max-w-100 text-[14px] leading-[1.75] text-white/60 md:text-[15px]"
               >
                 Tell us what you are building. We will come back with questions, a plan and an
                 honest view of how we would engineer it.

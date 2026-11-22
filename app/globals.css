@@ -7,10 +7,9 @@ html::-webkit-scrollbar {
   scroll-behavior: smooth;
 }
 
-
 @font-face {
   font-family: 'Bebas';
-  src: url('../font/Bebas_Neue,Manrope/Bebas_Neue/BebasNeue-Regular.ttf') format('woff2');
+  src: url('../font/Bebas_Neue,Manrope/Bebas_Neue/BebasNeue-Regular.ttf') format('truetype');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -18,7 +17,7 @@ html::-webkit-scrollbar {
 
 @font-face {
   font-family: 'Manrope';
-  src: url('../font/Bebas_Neue,Manrope/Manrope/Manrope-VariableFont_wght.ttf') format('woff2');
+  src: url('../font/Bebas_Neue,Manrope/Manrope/static/Manrope-Regular.ttf') format('truetype');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -33,8 +32,6 @@ h2,
 h3 {
   font-family: 'Bebas', sans-serif;
 }
-
-
 
 .font-bebas {
   font-family: 'Bebas', sans-serif;

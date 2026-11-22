@@ -1,6 +1,5 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
 import {
   AnimatePresence,
   MotionConfig,
@@ -11,6 +10,7 @@ import {
   useReducedMotion,
   useScroll,
 } from 'motion/react'
+import { useEffect, useRef, useState } from 'react'
 
 const EASE = [0.16, 1, 0.3, 1]
 
@@ -285,13 +285,10 @@ function Count({ to, suffix }) {
   const reduce = useReducedMotion()
   const ref = useRef(null)
   const inView = useInView(ref, { once: true, amount: 0.6 })
-  const [value, setValue] = useState(0)
+  const [value, setValue] = useState(reduce ? to : 0)
 
   useEffect(() => {
-    if (reduce) {
-      setValue(to)
-      return
-    }
+    if (reduce) return
     if (!inView) return
     const controls = animate(0, to, {
       duration: 1.8,

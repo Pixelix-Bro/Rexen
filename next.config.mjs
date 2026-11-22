@@ -6,26 +6,6 @@ const YEAR = 60 * 60 * 24 * 365
 const MONTH = 60 * 60 * 24 * 30
 const isProd = process.env.NODE_ENV === 'production'
 
-const DESKTOP_DIR = '/media/frames'
-const MOBILE_DIR = '/media/frames-sm'
-const DESKTOP_QUERY = '(min-width: 769px)'
-const MOBILE_QUERY = '(max-width: 768px)'
-const PRELOAD_COUNT = 8
-const PRELOAD_STEP = 6
-
-const frameFile = (i) => `f_${String(i + 1).padStart(3, '0')}.webp`
-
-const preloadLinks = (dir, media) =>
-  Array.from({ length: PRELOAD_COUNT }, (_, n) => {
-    const priority = n === 0 ? '; fetchpriority=high' : ''
-    return `<${dir}/${frameFile(n * PRELOAD_STEP)}>; rel=preload; as=image; type=image/webp; media="${media}"${priority}`
-  })
-
-const FRAME_PRELOAD_HEADER = [
-  ...preloadLinks(DESKTOP_DIR, DESKTOP_QUERY),
-  ...preloadLinks(MOBILE_DIR, MOBILE_QUERY),
-].join(', ')
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactCompiler: true,
@@ -64,15 +44,15 @@ const nextConfig = {
         ],
       },
       {
-        source: '/',
-        headers: [{ key: 'Link', value: FRAME_PRELOAD_HEADER }],
-      },
-      {
         source: '/media/:path*',
         headers: [
           {
             key: 'Cache-Control',
             value: `public, max-age=${MONTH}, stale-while-revalidate=86400`,
+          },
+          {
+            key: 'Accept-Ranges',
+            value: 'bytes',
           },
         ],
       },

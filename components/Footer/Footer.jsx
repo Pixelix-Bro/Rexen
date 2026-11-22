@@ -1,6 +1,5 @@
 'use client'
 
-import { useRef, useState } from 'react'
 import {
   MotionConfig,
   motion,
@@ -10,12 +9,9 @@ import {
   useSpring,
   useTransform,
 } from 'motion/react'
+import { useRef, useState } from 'react'
 
 const EASE = [0.16, 1, 0.3, 1]
-
-/* =========================================
-   TODO: Contact.jsx dagi CONTACT bilan bir xil qiymatlar
-========================================= */
 
 const CONTACT = {
   email: 'hello@rexen.uz',
@@ -28,7 +24,7 @@ const CONTACT = {
 const MENU = [
   { label: 'Home', href: '#home' },
   { label: 'About', href: '#about' },
-  { label: 'Why us', href: '#why-us' },
+  { label: 'Why us', href: '#why' },
   { label: 'FAQ', href: '#faq' },
   { label: 'Contact', href: '#contact' },
 ]
