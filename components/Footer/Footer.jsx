@@ -14,7 +14,7 @@ import { useRef, useState } from 'react'
 const EASE = [0.16, 1, 0.3, 1]
 
 const CONTACT = {
-  email: 'hello@rexen.uz',
+  email: 'rexen.studio@gmail.com',
   phone: '+998 50 717 79 33',
   telegram: '@Pixelix',
   telegramUrl: 'https://t.me/Pixeelix',
