@@ -7,7 +7,7 @@ const EASE = [0.16, 1, 0.3, 1]
 
 const CONTACT = {
   email: 'rexen.studio@gmail.com',
-  phone: '+998 90 693 18 08',
+  phone: '+998 50 717 79 33',
   telegram: '@Pixelix',
   telegramUrl: 'https://t.me/pixeelix',
   location: 'Namangan, Uzbekistan',

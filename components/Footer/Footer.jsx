@@ -15,10 +15,10 @@ const EASE = [0.16, 1, 0.3, 1]
 
 const CONTACT = {
   email: 'hello@rexen.uz',
-  phone: '+998 90 000 00 00',
-  telegram: '@rexen',
-  telegramUrl: 'https://t.me/rexen',
-  location: 'Tashkent, Uzbekistan',
+  phone: '+998 50 717 79 33',
+  telegram: '@Pixelix',
+  telegramUrl: 'https://t.me/Pixeelix',
+  location: 'Namangan, Uzbekistan',
 }
 
 const MENU = [
