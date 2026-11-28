@@ -1,23 +1,13 @@
-/**
- * createFrameSequence(canvas, { total, path, concurrency, lookahead, onReady })
- * -> { draw(f), prefetch(f), destroy() }
- *
- * Strategy:
- *  1. ALL frames are downloaded up-front as small compressed Blobs, nearest-to-scroll first.
- *  2. Only a sliding window around the current frame is decoded to GPU-friendly ImageBitmaps
- *     (decoded off the main thread), so memory stays low and drawing is instant.
- *  3. Fractional frames are cross-blended, and a missing frame falls back to the nearest
- *     decoded one, so the canvas never flashes blank.
- */
 export function createFrameSequence(
   canvas,
-  { total, path, concurrency = 6, lookahead = 10, onReady } = {},
+  { total, path, concurrency = 6, lookahead = 10, onReady } = {}
 ) {
   const ctx = canvas.getContext('2d', { alpha: false })
   const canBitmap = typeof createImageBitmap === 'function'
 
-  const KEEP_BEHIND = 6
-  const KEEP_AHEAD = Math.max(lookahead * 2, 12)
+  const compact = window.matchMedia('(max-width: 1024px)').matches
+  const KEEP_BEHIND = compact ? 3 : 5
+  const KEEP_AHEAD = compact ? 10 : Math.max(lookahead * 2, 12)
 
   const blobs = new Array(total).fill(null)
   const bitmaps = new Array(total).fill(null)
@@ -157,7 +147,8 @@ export function createFrameSequence(
   }
 
   const resize = () => {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2)
+    const compact = window.matchMedia('(max-width: 1024px)').matches
+    const dpr = Math.min(window.devicePixelRatio || 1, compact ? 1.5 : 2)
     const w = Math.round(canvas.clientWidth * dpr)
     const h = Math.round(canvas.clientHeight * dpr)
     if (!w || !h || (w === cw && h === ch)) return
